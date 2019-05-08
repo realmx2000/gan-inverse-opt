@@ -28,8 +28,13 @@ class SyntheticDataset(Dataset):
         return 1e5 #Chosen arbitrarily
 
     def __getitem__(self, index):
-        idx = np.random.choice(self.length)
-        return self.data[idx]
+        # Balanced train set
+        if np.random.rand() < 0.5:
+            idx = index % self.length
+            item = self.data[idx]
+        else:
+            item = np.random.rand(self.dim, 1)
+        return item
 
     def get_solutions(self):
         x = cp.Variable((self.dim, 1))
