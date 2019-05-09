@@ -1,5 +1,6 @@
 import torch
 import math
+import numpy as np
 
 class SubgradientSolver:
     def __init__(self, dim, step_schedule, lamb):
@@ -8,18 +9,27 @@ class SubgradientSolver:
         self.lamb = lamb
 
     def optimize(self, obj, constraints):
-        x = torch.rand((self.dim, 1))
-        # Arbitrarily decided to do 100 iterations - primal dual will fix this.
-        for it in range(100):
-            g = obj.subgradient_obj(x)
+        x = torch.zeros((self.dim, 1))
+
+        for it in range(500):
+            g = obj.subgradient(x)
             for constraint in constraints:
-                g -= 1 / self.lamb * constraint.subgradeint_cons(x) / constraint.violation(x)
+                if constraint.violation(x) >= 0.01:
+                    g = constraint.subgradient(x)
+                    break
+                else:
+                    g = g - (1 / self.lamb) * (constraint.subgradient(x) / constraint.violation(x))
+
             if type(self.schedule) is float:
-                x -= self.schedule * g
+                x = x - self.schedule * g
             elif self.schedule == "inv":
-                x -= 1 / (it + 1) * g
+                x = x - 1 / (it + 1) * g
             elif self.schedule == "inv sq root":
-                x -= 1 / math.sqrt(it + 1) * g
+                x = x - 1 / math.sqrt(it + 1) * g
             else:
                 raise Exception("Invalid schedule for subgradient solver.")
+            if it >= 100 and np.random.rand() < 0.005:
+                break
+
         return x
+

@@ -7,11 +7,11 @@ class ArgParser(object):
         self.parser.add_argument("--constraint_type", type=str, choices=["linear"], default="linear")
         self.parser.add_argument("--num_constraints", type=int, default=11)
         self.parser.add_argument("--dim", type=int, default=10, help="Dimensionality of solution space.")
-        self.parser.add_argument("--lambda", type=float, default=1.0, help="Scale factor for log barrier.")
+        self.parser.add_argument("--lambda", type=float, default=1000.0, dest="lamb", help="Scale factor for log barrier.")
         self.parser.add_argument("--activation", type=str, choices=["relu", "leaky", "sigmoid", "tanh"], default="relu")
         self.parser.add_argument("--solver", type=str, choices=["subgradident"], default="subgradient",
                                  help="Solver to use in generator.")
-        self.parser.add_argument("--solve_schedule", default="inv", help="Step schedule for solver.")
+        self.parser.add_argument("--solve_schedule", default="inv sq root", help="Step schedule for solver.")
         self.parser.add_argument("--optimizer", type=str, choices=["sgd", "nesterov", "adam"], default="adam")
         self.parser.add_argument("--momentum", type=float, default=0.1)
         self.parser.add_argument("--reg", type=float, default=1e-4)

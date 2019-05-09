@@ -1,29 +1,27 @@
 import numpy as np
 import torch
-import cvxpy as cp
+import torch.nn as nn
 
-class Linear:
+class Linear(nn.Module):
     def __init__(self, dims, vec=None):
+        super().__init__()
         if vec is None:
-            self.vec = torch.rand((dims, 1))
+            self.vec = nn.Parameter(5 * (torch.rand((dims, 1)) - 0.5))
         else:
             self.vec = vec
-        self.b = torch.rand(1)
+        self.b = torch.tensor(1)#nn.Parameter(5 * (torch.rand(1) - 0.5))
 
-    def subgradient_obj(self, x):
+    def subgradient(self, x):
         return self.vec
 
-    def subgradient_cons(self, x):
-        return -self.vec
-
-    def eval(self, x):
-        return torch.dot(x, self.vec)
+    def forward(self, x):
+        return torch.matmul(self.vec.t(), x)
 
     def eval_cp(self, x):
-        return x.T @ self.vec.numpy()
+        return x.T @ self.vec.detach().numpy()
 
     def violation(self, x):
-        return self.b - torch.dot(x, self.vec)
+        return torch.matmul(self.vec.t(), x) - self.b
 
     def violation_cp(self, x):
-        return self.b - x.T @ self.vec.numpy()
+        return  x.T @ self.vec.detach().numpy() - self.b.detach().numpy()
