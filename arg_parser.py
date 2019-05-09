@@ -17,7 +17,7 @@ class ArgParser(object):
         self.parser.add_argument("--reg", type=float, default=1e-4)
         self.parser.add_argument("--lr", type=float, default=1e-3)
         self.parser.add_argument("--epochs", type=int, default=100)
-        self.parser.add_argument("--batch_size", type=int, default=5)
+        self.parser.add_argument("--batch_size", type=int, default=1)
         self.parser.add_argument("--train_ratio", type=int, default=4,
                                  help="Number of discriminator training steps per generator training step.")
 

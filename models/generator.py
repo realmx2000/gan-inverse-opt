@@ -4,9 +4,9 @@ from .solvers import *
 import torch.nn as nn
 
 class Generator(nn.Module):
-    def __init__(self, obj_type, constraint_type, num_constraints, dim, solver_type, schedule, lamb):
+    def __init__(self, obj_type, constraint_type, num_constraints, dim, solver_type, schedule, lamb, obj=None):
         if obj_type == "linear":
-            self.obj = Linear(dim)
+            self.obj = Linear(dim, obj)
         else:
             raise Exception("Objective type %s invalid." % obj_type)
 

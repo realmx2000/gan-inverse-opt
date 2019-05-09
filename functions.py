@@ -3,15 +3,12 @@ import torch
 import cvxpy as cp
 
 class Linear:
-    def __init__(self, dims):
-        self.vec = torch.rand((dims, 1))
+    def __init__(self, dims, vec=None):
+        if vec is None:
+            self.vec = torch.rand((dims, 1))
+        else:
+            self.vec = vec
         self.b = torch.rand(1)
-
-    def set_params(self, a):
-        self.vec = a
-
-    def get_params(self):
-        return self.vec
 
     def subgradient_obj(self, x):
         return self.vec

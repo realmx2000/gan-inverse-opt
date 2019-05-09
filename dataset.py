@@ -4,11 +4,11 @@ import numpy as np
 from functions import *
 
 class SyntheticDataset(Dataset):
-    def __init__(self, obj_type, constraint_type, num_constraints, dim):
+    def __init__(self, obj_type, constraint_type, num_constraints, dim, obj=None):
         super.__init__()
         self.dim = dim
         if obj_type == "linear":
-            self.obj = Linear(dim)
+            self.obj = Linear(dim, obj)
         else:
             raise Exception("Objective type %s invalid." % obj_type)
 
@@ -25,15 +25,12 @@ class SyntheticDataset(Dataset):
         self.length = len(self.data)
 
     def __len__(self):
-        return 1e5 #Chosen arbitrarily
+        return 1000 #Chosen arbitrarily
 
     def __getitem__(self, index):
         # Balanced train set
-        if np.random.rand() < 0.5:
-            idx = index % self.length
-            item = self.data[idx]
-        else:
-            item = np.random.rand(self.dim, 1)
+        idx = index % self.length
+        item = self.data[idx]
         return item
 
     def get_solutions(self):
