@@ -3,7 +3,7 @@ from dataset import SyntheticDataset
 from arg_parser import ArgParser
 from torch.utils.data import DataLoader
 from torch.optim import SGD, Adam
-import cvxpy as cp
+from models.solvers import NewtonSolver
 import torch
 import numpy as np
 
@@ -17,34 +17,36 @@ def get_optimizer(model, opt, lr, momentum, reg):
 
     return optimizer
 
-def verify_solution(dim, problems):
+def verify_solution(dim, objects):
     vals = []
-    for problem in problems:
-        x = cp.Variable((dim, 1))
-        obj = cp.Minimize(problem.obj.eval_cp(x))
-        constraints = []
-        for constraint in problem.constraints:
-            constraints.append(constraint.violation_cp(x) <= 0)
-        prob = cp.Problem(obj, constraints)
-        prob.solve()
-        print(prob.status)
-        vals.append(x.value)
+    for obj in objects:
+        x1, _ = obj.problem.solve_cp()
+        x2 = obj.problem.solve(NewtonSolver(dim, "inv sq root", 1000.0))
+        vals.append(x1)
+        vals.append(x2)
     print(vals[0])
     print(vals[1])
-    print(np.linalg.norm(vals[0] - vals[1]))
+    print(vals[2])
+    print(vals[3])
+    print(np.linalg.norm(vals[0] - vals[2]))
+
+#TODO: Some strange behavior - sometimes gradients jump even when loss is already zero, and loss seems to get
+#stuck sometimes even when gradients are nonzero.
+#TODO: Sometimes sign seems to flip on cvxpy minimizer?
+#TODO: Gradient updates sometimes make problem infeasible, then phase 1 fails.
 
 def train(args):
     vec = 5 * (torch.rand((args.dim, 1), requires_grad=False) - 0.5)
 
-    generator = Generator(args.obj_type, args.constraint_type, args.num_constraints,
+    generator = Generator(args.prob_type, args.num_constraints,
                           args.dim, args.solver, args.solve_schedule, args.lamb, obj=vec)
-    discriminator = Discriminator(args.dim, args.activation)
+    #discriminator = Discriminator(args.dim, args.activation)
 
-    dataset = SyntheticDataset(args.obj_type, args.constraint_type, args.num_constraints, args.dim, obj=vec)
+    dataset = SyntheticDataset(args.prob_type, args.num_constraints, args.dim, obj=vec)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    opt_gen = get_optimizer(generator, args.optimizer, args.lr, args.momentum, args.reg)
-    opt_discrim = get_optimizer(discriminator, args.optimizer, args.lr, args.momentum, args.reg)
+    opt_gen = get_optimizer(generator, args.optimizer, args.lr_g, args.momentum, args.reg)
+    #opt_discrim = get_optimizer(discriminator, args.optimizer, args.lr_d, args.momentum, args.reg)
 
     label_true = torch.tensor([1], dtype=torch.float)
     label_fake = torch.tensor([0], dtype=torch.float)
@@ -78,10 +80,10 @@ def train(args):
             opt_gen.step()
             losses_G.append(loss_G.detach().item())
 
+        for constraint in generator.problem.constraints:
+            print(constraint.vec.grad)
+
         print("Epoch %d, Generator loss %f" % (epoch, np.mean(losses_G) ))
-        for constraint in generator.constraints:
-            print(constraint.vec)
-            print(constraint.b)
         print(minimizer)
         print(generated)
     verify_solution(args.dim, [generator, dataset])

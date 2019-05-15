@@ -1,35 +1,24 @@
 import cvxpy as cp
 from torch.utils.data import Dataset
-from models.solvers.subgradient import SubgradientSolver
-from functions import *
+import numpy as np
+import torch
+from problems import generate_LP, Problem
+from models.solvers import *
 
 class SyntheticDataset(Dataset):
-    def __init__(self, obj_type, constraint_type, num_constraints, dim, obj=None):
+    def __init__(self, prob_type, num_constraints, dim, obj=None):
         super().__init__()
         self.dim = dim
-        if obj_type == "linear":
-            self.obj = Linear(dim, obj)
+        if prob_type == "LP":
+            self.problem = generate_LP(dim, num_constraints, vec=obj)
         else:
-            raise Exception("Objective type %s invalid." % obj_type)
-
-        self.constraints = []
-        if constraint_type == "linear":
-            for _ in range(num_constraints):
-                self.constraints.append(Linear(dim))
-        else:
-            raise Exception("Constraint type %s invalid." % constraint_type)
+            raise Exception("Objective type %s invalid." % prob_type)
 
         self.data = self.get_solutions()
-        if len(self.data) == 0:
-            self.__init__(obj_type, constraint_type, num_constraints, dim)
         self.length = len(self.data)
 
-        for constraint in self.constraints:
-            print(constraint.vec)
-            print(constraint.b)
-
     def __len__(self):
-        return 10 #Chosen arbitrarily
+        return 100 #Chosen arbitrarily
 
     def __getitem__(self, index):
         # Balanced train set
@@ -38,25 +27,22 @@ class SyntheticDataset(Dataset):
         return item
 
     def get_solutions(self):
-        x = cp.Variable((self.dim, 1))
-        obj = cp.Minimize(self.obj.eval_cp(x))
-        constraints = []
-        for constraint in self.constraints:
-            constraints.append(constraint.violation_cp(x) <= 0)
-        prob = cp.Problem(obj, constraints)
-        prob.solve()
-        print(prob.status)
+        x, val = self.problem.solve_cp()
+        assert(x is not None) # Just rerun until this passes
 
-        """
-        solver = SubgradientSolver(self.dim, "inv sq root", 100.0)
-        x_test = solver.optimize(self.obj, self.constraints)
-        print(x.value)
-        print(x_test)
-        input()
-        """
+        minimizers = [x]
+        for _ in range(len(self)):
+            w = np.random.randn(self.dim, 1)
+            x = cp.Variable((self.dim, 1))
+            obj = cp.Minimize(w.T @ x)
+            constraints = [self.problem.eval_cp(x) <= val]
+            for constraint in self.problem.constraints:
+                constraints.append(constraint.violation_cp(x) <= 0)
+            prob = cp.Problem(obj, constraints)
+            prob.solve()
+            if any([(np.abs(x.value, y) <= 1e-4).all() for y in minimizers]):
+                minimizers.append(x.value)
 
-        #TODO: Find a way to get all optimal points
-        if prob.status != "optimal":
-            return []
-        else:
-            return [torch.from_numpy(x.value[:,0]).float()]
+        minimizers = [torch.from_numpy(x[:, 0]).float() for x in minimizers]
+
+        return minimizers

@@ -8,17 +8,15 @@ class SubgradientSolver:
         self.schedule = step_schedule
         self.lamb = lamb
 
-    def optimize(self, obj, constraints):
+    def optimize(self, problem):
         x = torch.zeros((self.dim, 1))
 
         for it in range(500):
-            g = obj.subgradient(x)
-            for constraint in constraints:
+            g, _ = problem.derivatives(x)
+            for constraint in problem.constraints:
                 if constraint.violation(x) >= 0.01:
                     g = constraint.subgradient(x)
                     break
-                else:
-                    g = g - (1 / self.lamb) * (constraint.subgradient(x) / constraint.violation(x))
 
             if type(self.schedule) is float:
                 x = x - self.schedule * g
