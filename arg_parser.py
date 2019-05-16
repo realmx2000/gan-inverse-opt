@@ -14,8 +14,8 @@ class ArgParser(object):
         self.parser.add_argument("--optimizer", type=str, choices=["sgd", "nesterov", "adam"], default="adam")
         self.parser.add_argument("--momentum", type=float, default=0.1)
         self.parser.add_argument("--reg", type=float, default=1e-4)
-        self.parser.add_argument("--lr_g", type=float, default=0.1)
-        self.parser.add_argument("--lr_d", type=float, default=1e-3)
+        self.parser.add_argument("--lr_g", type=float, default=1e-2)
+        self.parser.add_argument("--lr_d", type=float, default=1e-2)
         self.parser.add_argument("--epochs", type=int, default=100)
         self.parser.add_argument("--batch_size", type=int, default=1)
         self.parser.add_argument("--train_ratio", type=int, default=4,

@@ -41,7 +41,7 @@ class SyntheticDataset(Dataset):
             for constraint in self.problem.constraints:
                 constraints.append(constraint.violation_cp(x) <= 0)
             prob = cp.Problem(obj, constraints)
-            prob.solve()
+            prob.solve(solver="ECOS")
             if any([(np.abs(x.value - y) > 1e-4).all() for y in minimizers]):
                 minimizers.append(x.value)
 
