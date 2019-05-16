@@ -33,7 +33,7 @@ class Problem(torch.nn.Module):
         for constraint in self.constraints:
             constraints.append(constraint.violation_cp(x) <= 0)
         prob = cp.Problem(obj, constraints)
-        prob.solve()
+        prob.solve(solver="ECOS")
 
         return x.value, prob.value
 

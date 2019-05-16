@@ -14,6 +14,8 @@ def get_optimizer(model, opt, lr, momentum, reg):
         optimizer = SGD(model.parameters(), lr, momentum=momentum, weight_decay=reg)
     elif opt == "adam":
         optimizer = Adam(model.parameters(), lr=lr, weight_decay=reg)
+    else:
+        raise Exception("Invalid optimizer: %s", opt)
 
     return optimizer
 
@@ -24,15 +26,11 @@ def verify_solution(dim, objects):
         x2 = obj.problem.solve(NewtonSolver(dim, "inv sq root", 1000.0))
         vals.append(x1)
         vals.append(x2)
-    print(vals[0])
-    print(vals[1])
-    print(vals[2])
-    print(vals[3])
-    print(np.linalg.norm(vals[0] - vals[2]))
+    print("Verification: ")
+    print(np.linalg.norm(vals[0] - vals[2]) < 1e-3)
 
 #TODO: Some strange behavior - sometimes gradients jump even when loss is already zero, and loss seems to get
 #stuck sometimes even when gradients are nonzero.
-#TODO: Sometimes sign seems to flip on cvxpy minimizer?
 #TODO: Gradient updates sometimes make problem infeasible, then phase 1 fails.
 
 def train(args):
@@ -77,6 +75,7 @@ def train(args):
 
             #pred_gen, loss_G = discriminator(generated, label_true)
             loss_G.backward()
+            torch.nn.utils.clip_grad_value_(generator.parameters(), 10)
             opt_gen.step()
             losses_G.append(loss_G.detach().item())
 
@@ -84,8 +83,6 @@ def train(args):
             print(constraint.vec.grad)
 
         print("Epoch %d, Generator loss %f" % (epoch, np.mean(losses_G) ))
-        print(minimizer)
-        print(generated)
     verify_solution(args.dim, [generator, dataset])
 
 

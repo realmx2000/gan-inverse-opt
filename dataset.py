@@ -18,7 +18,7 @@ class SyntheticDataset(Dataset):
         self.length = len(self.data)
 
     def __len__(self):
-        return 100 #Chosen arbitrarily
+        return 10 #Chosen arbitrarily
 
     def __getitem__(self, index):
         # Balanced train set
@@ -32,15 +32,17 @@ class SyntheticDataset(Dataset):
 
         minimizers = [x]
         for _ in range(len(self)):
-            w = np.random.randn(self.dim, 1)
+            #w = np.random.randn(self.dim, 1)
             x = cp.Variable((self.dim, 1))
-            obj = cp.Minimize(w.T @ x)
-            constraints = [self.problem.eval_cp(x) <= val]
+            #obj = cp.Minimize(w.T @ x)
+            obj = cp.Minimize(self.problem.obj.eval_cp(x))
+            #constraints = [self.problem.eval_cp(x) <= val]
+            constraints = []
             for constraint in self.problem.constraints:
                 constraints.append(constraint.violation_cp(x) <= 0)
             prob = cp.Problem(obj, constraints)
             prob.solve()
-            if any([(np.abs(x.value, y) <= 1e-4).all() for y in minimizers]):
+            if any([(np.abs(x.value - y) > 1e-4).all() for y in minimizers]):
                 minimizers.append(x.value)
 
         minimizers = [torch.from_numpy(x[:, 0]).float() for x in minimizers]
