@@ -32,31 +32,36 @@ def verify_solution(dim, objects):
 
 #TODO: Gradient updates sometimes make problem infeasible, then phase 1 fails.
 #TODO: Hessians are sometimes singular - does this have to do with improper gradient updates? Doesn't seem like it should be.
+#TODO: Discontinuity in training generator.
 #TODO: Discriminator and Generator both train to near perfect performance independently, but the GAN doesn't converge.
 #Looks like generated vectors often blow up after a couple epochs.
 
 def train(args):
+    mat = 5 * (torch.rand((args.dim, args.dim), requires_grad=False) - 0.5)
+    mat = mat @ mat.t()
     vec = 5 * (torch.rand((args.dim, 1), requires_grad=False) - 0.5)
 
-    generator = Generator(args.prob_type, args.num_constraints,
-                          args.dim, args.solver, args.solve_schedule, args.lamb, obj=vec)
-    discriminator = Discriminator(args.dim, args.activation)
+    generator = Generator(args.prob_type, args.num_constraints * 2,
+                          args.dim, args.solver, args.solve_schedule, args.lamb, mat=mat, vec=vec)
+    #discriminator = Discriminator(args.dim, args.activation)
 
-    dataset = SyntheticDataset(args.prob_type, args.num_constraints, args.dim, obj=vec)
+    dataset = SyntheticDataset(args.prob_type, args.num_constraints, args.dim, mat=mat, vec=vec)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     opt_gen = get_optimizer(generator, args.optimizer, args.lr_g, args.momentum, args.reg)
-    opt_discrim = get_optimizer(discriminator, args.optimizer, args.lr_d, args.momentum, args.reg)
+    #opt_discrim = get_optimizer(discriminator, args.optimizer, args.lr_d, args.momentum, args.reg)
 
     label_true = torch.tensor([1], dtype=torch.float)
     label_fake = torch.tensor([0], dtype=torch.float)
 
-    #loss_fn = torch.nn.MSELoss()
+    #loss_fn = lambda x, y: torch.norm(x - y, p=float('inf'))
+    loss_fn = torch.nn.L1Loss(reduction='sum')
     #TODO: Currently batch size is 1. Does it make sense to increase?
     for epoch in range(args.epochs):
         losses_D = []
         losses_G = []
         for minimizer in dataloader:
+            """
             for _ in range(args.train_ratio):
                 discriminator.zero_grad()
                 generated = generator().t()
@@ -68,15 +73,21 @@ def train(args):
                 loss_D.backward()
                 opt_discrim.step()
                 losses_D.append(loss_D.detach().item())
-
+            """
 
             generator.zero_grad()
             generated = generator().t()
-            #loss_G = loss_fn(generated, minimizer)
-
-            pred_gen, loss_G = discriminator(generated, label_true)
+            loss_G = loss_fn(generated, minimizer)
+            #pred_gen, loss_G = discriminator(generated, label_true)
             loss_G.backward()
-            torch.nn.utils.clip_grad_value_(generator.parameters(), 10)
+            """
+            print(minimizer)
+            print(generated)
+            for param in generator.parameters():
+                print(param.grad)
+            input()
+            """
+            #torch.nn.utils.clip_grad_value_(generator.parameters(), 10)
             opt_gen.step()
             losses_G.append(loss_G.detach().item())
 

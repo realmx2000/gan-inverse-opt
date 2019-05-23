@@ -29,4 +29,5 @@ class NewtonSolver:
             x = self.backtrack_search(problem, x, step, g)
             if decrement / 2 < 0.0001:
                 break
+
         return x

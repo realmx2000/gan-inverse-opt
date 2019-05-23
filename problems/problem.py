@@ -1,5 +1,6 @@
 import torch
 import cvxpy as cp
+import numpy as np
 
 class Problem(torch.nn.Module):
     def __init__(self, dim, obj, constraints, lamb=1000.0):
@@ -50,11 +51,14 @@ class Problem(torch.nn.Module):
         return g, hess
 
     def phase_1(self):
-        x = cp.Variable((self.dim, 1))
-        obj = cp.Minimize(0)
-        constraints_cp = []
-        for constraint in self.constraints:
-            constraints_cp.append(constraint.violation_cp(x) <= -0.01)
-        prob = cp.Problem(obj, constraints_cp)
-        prob.solve()
+        if len(self.constraints) > 0:
+            x = cp.Variable((self.dim, 1))
+            obj = cp.Minimize(0)
+            constraints_cp = []
+            for constraint in self.constraints:
+                constraints_cp.append(constraint.violation_cp(x) <= -0.01)
+            prob = cp.Problem(obj, constraints_cp)
+            prob.solve()
+        else:
+            return np.random.randn(self.dim, 1)
         return x.value
