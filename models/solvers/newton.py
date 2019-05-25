@@ -20,7 +20,7 @@ class NewtonSolver:
     def optimize(self, problem):
         x = torch.from_numpy(problem.phase_1().astype(np.float32))
 
-        for it in range(100):
+        for it in range(500):
             g, hess = problem.derivatives(x)
             hessinv = torch.inverse(hess)
             step = -hessinv @ g
@@ -29,5 +29,5 @@ class NewtonSolver:
             x = self.backtrack_search(problem, x, step, g)
             if decrement / 2 < 0.0001:
                 break
-
+        #print(it)
         return x

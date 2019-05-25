@@ -35,8 +35,10 @@ class Problem(torch.nn.Module):
             constraints.append(constraint.violation_cp(x) <= 0)
         prob = cp.Problem(obj, constraints)
         prob.solve(solver="ECOS")
+        dual = [constraint.dual_value.squeeze() for constraint in constraints]
+        dual = np.expand_dims(np.asarray(dual), 1)
 
-        return x.value, prob.value
+        return x.value.astype(np.float32), prob.value.astype(np.float32), dual.astype(np.float32)
 
     def derivatives(self, x):
         hess = self.obj.hessian(x)

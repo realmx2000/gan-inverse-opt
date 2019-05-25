@@ -2,17 +2,21 @@ import cvxpy as cp
 from torch.utils.data import Dataset
 import numpy as np
 import torch
-from problems import generate_LP, generate_QP
+from problems import *
 from models.solvers import *
 
 class SyntheticDataset(Dataset):
-    def __init__(self, prob_type, num_constraints, dim, mat=None, vec=None):
+    def __init__(self, prob_type, num_constraints, dim, constraint_dims=None, mat=None, vec=None):
         super().__init__()
         self.dim = dim
         if prob_type == "LP":
             self.problem = generate_LP(dim, num_constraints, vec=vec)
         elif prob_type == "QP":
             self.problem = generate_QP(dim, num_constraints, mat=mat, vec=vec)
+        elif prob_type == "QCQP":
+            self.problem = generate_QCQP(dim, num_constraints, mat=mat, vec=vec)
+        elif prob_type == "SOCP":
+            self.problem = generate_SOCP(dim, constraint_dims, vec=vec)
         else:
             raise Exception("Objective type %s invalid." % prob_type)
 
@@ -20,7 +24,7 @@ class SyntheticDataset(Dataset):
         self.length = len(self.data)
 
     def __len__(self):
-        return 1 #Chosen arbitrarily
+        return 10 #Chosen arbitrarily
 
     def __getitem__(self, index):
         # Balanced train set
@@ -29,11 +33,18 @@ class SyntheticDataset(Dataset):
         return item
 
     def get_solutions(self):
-        x, val = self.problem.solve_cp()
+        #self.problem = test_QCQP(self.dim)
+        x, val, _ = self.problem.solve_cp()
         assert(x is not None) # Just rerun until this passes
 
         minimizers = [x]
-        solver = NewtonSolver(self.dim, "inv sq root", 1000.0)
+        #solver = NewtonSolver(self.dim, "inv sq root", 10000.0)
+        #x_test = solver.optimize(self.problem)
+        #print(x)
+        #print(x_test)
+        #print(self.problem.forward(torch.tensor(x)))
+        #print(self.problem.forward(x_test))
+        #input()
         for _ in range(len(self)):
             #w = np.random.randn(self.dim, 1)
             x = cp.Variable((self.dim, 1))
