@@ -39,7 +39,7 @@ def verify_solution(dim, objects):
     print("Verification: ")
     print(np.linalg.norm(vals[0] - vals[2]) < 1e-3)
 
-
+"""
 def analytic_gradients(prob, generated):
     Q = prob.obj.mat.detach().numpy()
     G = np.zeros((len(prob.constraints), prob.dim)).astype(np.float32)
@@ -48,8 +48,8 @@ def analytic_gradients(prob, generated):
         G[i,:] = constraint.vec.detach().numpy().squeeze()
         h[i,:] = constraint.b.detach().numpy()
     x, _, lamb = prob.solve_cp()
-    lamb_vec = lamb.squeeze()
-    diff = np.block([[Q, G.T @ np.diag(lamb_vec)], [G, np.diag((G @ x - h).squeeze())]])
+    lamb_vec = lamb.squeeze(1)
+    diff = np.block([[Q, G.T @ np.diag(lamb_vec)], [G, np.diag((G @ x - h).squeeze(1))]])
     grad = np.concatenate([generated.grad.numpy().T, np.zeros((len(prob.constraints), 1)).astype(np.float32)])
     d = np.linalg.solve(diff, grad)
     dx = d[:x.shape[0]]
@@ -60,21 +60,24 @@ def analytic_gradients(prob, generated):
     for i, constraint in enumerate(prob.constraints):
         constraint.vec.grad = torch.from_numpy(np.expand_dims(dG[i,:], 1))
         constraint.b.grad = torch.from_numpy(dh[i])
+"""
 
 #TODO: Discriminator and Generator both train to near perfect performance independently, but the GAN doesn't converge.
 #Looks like generated vectors often blow up after a couple epochs.
 #TODO: Generalize the KKT gradients
 
 def train(args):
-    mat = 5 * (torch.rand((args.dim, args.dim), requires_grad=False) - 0.5)
-    mat = mat @ mat.t()
-    vec = 5 * (torch.rand((args.dim, 1), requires_grad=False) - 0.5)
+    #torch.manual_seed(6)
+    #np.random.seed(6)
+    #mat = 5 * (torch.rand((args.dim, args.dim), requires_grad=False) - 0.5)
+    #mat = mat @ mat.t()
+    #vec = 5 * (torch.rand((args.dim, 1), requires_grad=False) - 0.5)
 
     generator = Generator(args.prob_type, args.num_constraints, args.dim, args.solver, args.solve_schedule,
-                          args.lamb, args.constraint_dims, mat=mat, vec=vec)
+                          args.lamb, args.constraint_dims) #mat=mat, vec=vec,
     #discriminator = Discriminator(args.dim, args.activation)
 
-    dataset = SyntheticDataset(args.prob_type, args.num_constraints, args.dim, args.constraint_dims, mat=mat, vec=vec)
+    dataset = SyntheticDataset(args.prob_type, args.num_constraints, args.dim, args.constraint_dims) #, mat=mat, vec=vec,
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     opt_gen = get_optimizer(generator, args.optimizer, args.lr_g, args.momentum, args.reg)
@@ -108,13 +111,15 @@ def train(args):
             """
 
             generator.zero_grad()
-            generated = generator().t()
+            generated, dual = generator()
+            generated = generated.t()
             generated.retain_grad()
             loss_G = loss_fn(generated, minimizer)
             loss_G = loss_G
             #pred_gen, loss_G = discriminator(generated, label_true)
             loss_G.backward()
-            analytic_gradients(generator.problem, generated)
+            #analytic_gradients(generator.problem, generated)
+            generator.backward(generated, dual)
             #torch.nn.utils.clip_grad_value_(generator.parameters(), 10)
             opt_gen.step()
             losses_G.append(loss_G.detach().item())

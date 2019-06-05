@@ -1,6 +1,7 @@
 import torch
 import cvxpy as cp
 import numpy as np
+from collections import defaultdict
 
 class Problem(torch.nn.Module):
     def __init__(self, dim, obj, constraints, lamb=1000.0):
@@ -64,3 +65,103 @@ class Problem(torch.nn.Module):
         else:
             return np.random.randn(self.dim, 1)
         return x.value
+
+    def KKT_hessian(self, x, lamb):
+        x = x.t()
+        Df = np.zeros((len(self.constraints), self.dim))
+        f = np.zeros(len(self.constraints))
+        hess = self.obj.hessian(x).detach().numpy()
+        for i, constraint in enumerate(self.constraints):
+            hess += lamb[i] * constraint.hessian(x).detach().numpy()
+            Df[i,:] = constraint.subgradient(x).detach().numpy().T
+            f[i] = constraint.violation(x).detach().numpy()
+
+        kkt_hess = np.block([[hess, Df.T], [np.diag(lamb.squeeze()) @ Df, np.diag(f)]])
+        return kkt_hess
+
+    def calc_gradients(self, x, lamb):
+        lamb_vec = lamb.squeeze(1)
+        kkt_hess = self.KKT_hessian(x, lamb).astype(np.float32)
+        grad = x.grad
+        x = x.detach().numpy()
+        full_grad = torch.cat([grad, torch.zeros((1, len(self.constraints)))], dim=1)
+        d = np.linalg.solve(kkt_hess, full_grad.numpy().T)
+        dx = d[:x.shape[1]]
+        dlamb = d[x.shape[1]:]
+
+        #dh = np.diag(lamb_vec) @ dlamb
+        dG = -np.diag(lamb_vec) @ (dlamb @ x + lamb @ dx.T)
+        dQ = -0.5 * (dx @ x + x.T @ dx.T)
+        dq = -dx
+        #self.obj.mat.grad = torch.from_numpy(dQ)
+        #self.obj.vec.grad = torch.from_numpy(dq)
+        for i, constraint in enumerate(self.constraints):
+            constraint.vec.grad = torch.from_numpy(np.expand_dims(dG[i, :], 1))
+            #constraint.b.grad = torch.from_numpy(dh[i])
+
+    def multiply(self, x, y):
+        if x is None:
+            return y
+        if y is None:
+            return x
+        if x.numel() == 1 or y.numel() == 1:
+            return x * y
+        else:
+            return x @ y
+
+    def eval_term(self, term):
+        post = None
+        pre = None
+        found = False
+        for i, item in enumerate(term):
+            if isinstance(item, int) and item == 1:
+                transpose = True
+                found = True
+                continue
+            elif isinstance(item, str) and item == 'T':
+                transpose = False
+                found = True
+                continue
+            if not found:
+                post = item if post is None else self.multiply(post, item)
+            else:
+                pre = item if pre is None else self.multiply(pre, item)
+        if not found:
+            return 0
+        return self.multiply(pre, post) if not transpose else self.multiply(post, pre).t()
+
+
+    def calc_gradients_general(self, x, lamb):
+        kkt_hess = self.KKT_hessian(x, lamb)
+        lamb = torch.from_numpy(lamb)
+        grad = x.grad
+        x = x.t()
+        full_grad = torch.cat([grad, torch.zeros((1, len(self.constraints)))], dim=1)
+        d = -np.linalg.solve(kkt_hess, full_grad.numpy().T).astype(np.float32)
+        dx = torch.from_numpy(d[:x.shape[0]])
+        dlamb = torch.from_numpy(d[x.shape[0]:])
+        if len(self.obj.param_list) > 0:
+            perturb = defaultdict(int)
+            for name, param in self.obj.param_list.items():
+                perturb[name] = 1
+                term = self.obj.differential_grad(perturb, x)
+                term.append(dx)
+                gradient = self.eval_term(term)
+                param.grad = gradient
+                perturb[name] = 0
+
+        for i, constraint in enumerate(self.constraints):
+            perturb = defaultdict(int)
+            for name, param in constraint.param_list.items():
+                perturb[name] = 1
+                term1 = constraint.differential_grad(perturb, x) + [lamb[i] * lamb[i]] #TODO: Unsure why D(lambda) is multiplied in
+                term1.append(dx)
+                grad_1 = self.eval_term(term1)
+                term2 = constraint.differential(perturb, x) + [lamb[i]]
+                term2.append(dlamb[i])
+                grad_2 = self.eval_term(term2)
+                gradient = grad_1 + grad_2
+                if constraint.param_specs[name] == "psd":
+                    gradient = 0.5 * (gradient + gradient.t())
+                param.grad = gradient
+                perturb[name] = 0

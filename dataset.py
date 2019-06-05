@@ -6,7 +6,9 @@ from problems import *
 from models.solvers import *
 
 class SyntheticDataset(Dataset):
-    def __init__(self, prob_type, num_constraints, dim, constraint_dims=None, mat=None, vec=None):
+    def __init__(self, prob_type, num_constraints, dim, constraint_dims=None, matrix_dim=None, mat=None, vec=None):
+        #torch.manual_seed(5)
+        #np.random.seed(5)
         super().__init__()
         self.dim = dim
         if prob_type == "LP":
@@ -17,6 +19,8 @@ class SyntheticDataset(Dataset):
             self.problem = generate_QCQP(dim, num_constraints, mat=mat, vec=vec)
         elif prob_type == "SOCP":
             self.problem = generate_SOCP(dim, constraint_dims, vec=vec)
+        elif prob_type == "SDP":
+            self.problem = generate_SDP(dim, num_constraints, matrix_dim, vec=vec)
         else:
             raise Exception("Objective type %s invalid." % prob_type)
 

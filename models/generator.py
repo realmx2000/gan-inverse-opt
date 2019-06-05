@@ -27,5 +27,9 @@ class Generator(nn.Module):
 
     def forward(self):
         #minimizer = self.problem.solve(self.solver)
-        minimizer, _, _ = self.problem.solve_cp()
-        return torch.tensor(minimizer.astype(np.float32), requires_grad=True)
+        minimizer, _, dual = self.problem.solve_cp()
+        return torch.tensor(minimizer.astype(np.float32), requires_grad=True), dual
+
+    def backward(self, x, lamb):
+        #self.problem.calc_gradients(x, lamb)
+        self.problem.calc_gradients_general(x, lamb)

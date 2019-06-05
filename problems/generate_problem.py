@@ -16,7 +16,7 @@ def generate_LP(dim, num_constraints, lamb=1000.0, vec=None):
     return Problem(dim, obj, constraints, lamb)
 
 def generate_QP(dim, num_constraints, lamb=1000.0, mat=None, vec=None):
-    obj = Quadratic(dim, mat, vec, 0)
+    obj = Quadratic(dim, mat, vec, torch.tensor(0, requires_grad=False))
     if num_constraints > 0:
         A = torch.randn((num_constraints, dim))
         x = torch.randn((dim, 1))
@@ -40,13 +40,15 @@ def test_QCQP(dim):
     return Problem(dim, obj, constraint, 1000.0)
 
 def generate_QCQP(dim, num_constraints, lamb=1000.0, mat=None, vec=None):
-    obj = Quadratic(dim, mat, vec, 0)
+    obj = Quadratic(dim, mat, vec, torch.tensor(0, requires_grad=False))
 
     #TODO: How to make this feasible?
     if num_constraints > 0:
         constraints = torch.nn.ModuleList()
         for i in range(num_constraints):
-            constraints.append(Quadratic(dim))
+            vec = torch.zeros((dim, 1), requires_grad=False)
+            #cons = torch.tensor((-1), requires_grad=False)
+            constraints.append(Quadratic(dim, vec=vec))
     else:
         constraints = []
     return Problem(dim, obj, constraints, lamb)
@@ -64,4 +66,10 @@ def generate_SOCP(dim, constraint_dims, lamb=1000.0, vec=None):
             constraints.append(SecondOrderCone(dim, A, b, c, d))
     else:
         constraints = []
+    return Problem(dim, obj, constraints, lamb)
+
+def generate_SDP(dim, num_constraints, matrix_dim, lamb=1000.0, vec=None):
+    obj = Linear(dim, vec=vec)
+    constraints = torch.nn.ModuleList()
+    constraints.append(Semidefinite(dim, matrix_dim))
     return Problem(dim, obj, constraints, lamb)
